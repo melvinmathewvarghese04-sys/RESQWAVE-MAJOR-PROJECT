@@ -1,0 +1,81 @@
+package com.example.adhocacousticrescue
+
+import android.content.Context
+import android.net.wifi.p2p.WifiP2pInfo
+import java.io.ObjectInputStream
+import java.io.ObjectOutputStream
+import java.net.ServerSocket
+import java.net.Socket
+import kotlin.concurrent.thread
+
+class NetworkService(val context: Context, val onMessageReceived: (String) -> Unit) {
+    private val PORT = 8888
+    var isGroupOwner = false
+    private var serverSocket: ServerSocket? = null
+
+    data class CustomPacket(
+        val source: String,
+        val destination: String,
+        val type: String,
+        val timestamp: Long,
+        val data: ByteArray,
+        val latitude: Double = 0.0,
+        val longitude: Double = 0.0,
+        val amplitude: Int = 0
+    )
+
+    fun onConnectionInfoAvailable(info: WifiP2pInfo) {
+        this.isGroupOwner = info.isGroupOwner
+        if (isGroupOwner) startServer()
+    }
+
+    private fun startServer() {
+        thread {
+            try {
+                serverSocket?.close()
+                serverSocket = ServerSocket(PORT)
+                while (true) {
+                    val socket = serverSocket?.accept() ?: continue
+                    thread {
+                        try {
+                            val input = ObjectInputStream(socket.getInputStream())
+                            val bytes = input.readObject() as ByteArray
+                            val packet = PacketSerializer.deserialize(bytes) ?: return@thread
+                            
+                            val msg = when(packet.type) {
+                                "SOS" -> "🚨 EMERGENCY @ [${packet.latitude}, ${packet.longitude}] from ${packet.source}"
+                                "HELLO" -> "NODE LINKED: ${packet.source}"
+                                "MSG" -> "📩 MSG: ${String(packet.data)} from ${packet.source}"
+                                "LOUD" -> "⚠️ TRIGGER: Sound Spike @ ${packet.source}"
+                                else -> "Data from ${packet.source}"
+                            }
+                            onMessageReceived(msg)
+                            socket.close()
+                        } catch (e: Exception) { socket.close() }
+                    }
+                }
+            } catch (e: Exception) { }
+        }
+    }
+
+    fun sendDataPacket(packet: CustomPacket) {
+        thread { sendDataPacketSync(packet) }
+    }
+
+    fun sendDataPacketSync(packet: CustomPacket): Boolean {
+        var socket: Socket? = null
+        return try {
+            val targetIP = if (!isGroupOwner) "192.168.49.1" else packet.destination
+            socket = Socket(targetIP, PORT)
+            socket.soTimeout = 2000
+            val output = ObjectOutputStream(socket.getOutputStream())
+            output.writeObject(PacketSerializer.serialize(packet))
+            output.flush()
+            true
+        } catch (e: Exception) {
+            false
+        } finally {
+            try { socket?.close() } catch (e: Exception) {}
+        }
+    }
+}
