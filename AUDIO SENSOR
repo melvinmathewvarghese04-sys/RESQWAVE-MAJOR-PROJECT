@@ -1,0 +1,50 @@
+package com.example.adhocacousticrescue
+
+import android.annotation.SuppressLint
+import android.media.AudioFormat
+import android.media.AudioRecord
+import android.media.MediaRecorder
+import kotlin.math.abs
+
+class AudioSensor(private val networkService: NetworkService, private val targetIp: String) : Thread() {
+    private var isRunning = false
+    private val SAMPLE_RATE = 44100
+    private val THRESHOLD = 12000 
+
+    @SuppressLint("MissingPermission")
+    fun startRecording() {
+        if (isRunning) return
+        isRunning = true
+        this.start()
+    }
+
+    fun stopRecording() { isRunning = false }
+
+    @SuppressLint("MissingPermission")
+    override fun run() {
+        val bufferSize = AudioRecord.getMinBufferSize(SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
+        val recorder = AudioRecord(MediaRecorder.AudioSource.MIC, SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, bufferSize)
+        val buffer = ShortArray(bufferSize)
+        try {
+            recorder.startRecording()
+            while (isRunning) {
+                val read = recorder.read(buffer, 0, buffer.size)
+                var max = 0
+                for (i in 0 until read) { if (abs(buffer[i].toInt()) > max) max = abs(buffer[i].toInt()) }
+                if (max > THRESHOLD) {
+                    networkService.sendDataPacket(NetworkService.CustomPacket(
+                        source = "ACOUSTIC_NODE", 
+                        destination = targetIp, 
+                        type = "LOUD", 
+                        timestamp = System.currentTimeMillis(), 
+                        data = ByteArray(0), 
+                        amplitude = max
+                    ))
+                }
+            }
+        } finally {
+            recorder.stop()
+            recorder.release()
+        }
+    }
+}
