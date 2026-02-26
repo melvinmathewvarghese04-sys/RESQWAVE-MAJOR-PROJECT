@@ -1,0 +1,238 @@
+package com.example.adhocacousticrescue
+
+import android.Manifest
+import android.annotation.SuppressLint
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.IntentFilter
+import android.content.pm.PackageManager
+import android.hardware.camera2.CameraManager
+import android.location.Location
+import android.location.LocationListener
+import android.location.LocationManager
+import android.net.wifi.p2p.WifiP2pDevice
+import android.net.wifi.p2p.WifiP2pInfo
+import android.net.wifi.p2p.WifiP2pManager
+import android.os.Build
+import android.os.Bundle
+import android.view.View
+import android.widget.*
+import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
+import androidx.lifecycle.lifecycleScope
+import com.example.adhocacousticrescue.R
+import kotlinx.coroutines.*
+
+class MainActivity : AppCompatActivity(), WifiP2pBroadcastReceiver.WifiP2pListener {
+
+    private var manager: WifiP2pManager? = null
+    private var channel: WifiP2pManager.Channel? = null
+    private var receiver: BroadcastReceiver? = null
+    private val intentFilter = IntentFilter()
+
+    private lateinit var tvStatus: TextView
+    private lateinit var tvGps: TextView
+    private lateinit var tvDeviceInfo: TextView
+    private lateinit var tvNetLog: TextView
+    private lateinit var scrollLog: ScrollView
+    private lateinit var cbHostMode: CheckBox
+    private lateinit var btnToggleSensor: Button
+    private lateinit var lvPeers: ListView
+    private lateinit var spinnerMsgs: Spinner
+
+    private lateinit var networkService: NetworkService
+    private var audioSensor: AudioSensor? = null
+    private var lastLocation: Location? = null
+    private var myNodeName: String = "Tactical-Node"
+    private val discoveredPeers = mutableListOf<WifiP2pDevice>()
+    private lateinit var peersAdapter: ArrayAdapter<String>
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
+
+        initUI()
+        networkService = NetworkService(this) { msg -> updateStatus(msg) }
+        setupIntentFilter()
+        initP2P()
+        setupGPS()
+        requestPermissions()
+    }
+
+    private fun setupIntentFilter() {
+        intentFilter.addAction(WifiP2pManager.WIFI_P2P_STATE_CHANGED_ACTION)
+        intentFilter.addAction(WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION)
+        intentFilter.addAction(WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION)
+        intentFilter.addAction(WifiP2pManager.WIFI_P2P_THIS_DEVICE_CHANGED_ACTION)
+    }
+
+    private fun initP2P() {
+        manager = getSystemService(Context.WIFI_P2P_SERVICE) as WifiP2pManager
+        channel = manager?.initialize(this, mainLooper, null)
+        receiver = WifiP2pBroadcastReceiver(manager!!, channel!!, this)
+        manager?.removeGroup(channel, null)
+    }
+
+    private fun requestPermissions() {
+        val permissions = mutableListOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.RECORD_AUDIO, Manifest.permission.CAMERA)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) permissions.add(Manifest.permission.NEARBY_WIFI_DEVICES)
+        ActivityCompat.requestPermissions(this, permissions.toTypedArray(), 100)
+    }
+
+    override fun updateStatus(status: String) {
+        runOnUiThread {
+            if (this::tvStatus.isInitialized) tvStatus.text = "Status: $status"
+            appendLog(status)
+        }
+    }
+
+    override fun updatePeersList(peers: Collection<WifiP2pDevice>) {
+        discoveredPeers.clear()
+        discoveredPeers.addAll(peers)
+        val names = peers.map { "${it.deviceName}\n[${it.deviceAddress}]" }
+        runOnUiThread {
+            if (this::peersAdapter.isInitialized) {
+                peersAdapter.clear()
+                peersAdapter.addAll(names)
+                peersAdapter.notifyDataSetChanged()
+            }
+        }
+    }
+
+    override fun onConnectionInfoAvailable(info: WifiP2pInfo) {
+        networkService.onConnectionInfoAvailable(info)
+        val role = if(info.isGroupOwner) "COMMANDER HUB" else "NODE (Syncing...)"
+        updateStatus("STATE: $role")
+
+        if (!info.isGroupOwner && info.groupFormed) {
+            lifecycleScope.launch(Dispatchers.IO) {
+                var synced = false
+                while(!synced) {
+                    delay(2500)
+                    val hello = NetworkService.CustomPacket(myNodeName, "192.168.49.1", "HELLO", System.currentTimeMillis(), ByteArray(0))
+                    synced = networkService.sendDataPacketSync(hello)
+                    if(!synced) appendLog("Star link pending...")
+                }
+                appendLog("Star Handshake Verified!")
+                runOnUiThread { tvStatus.text = "Status: LINKED TO HUB" }
+            }
+        }
+    }
+
+    override fun updateDeviceName(name: String) {
+        myNodeName = name
+        runOnUiThread { if (this::tvDeviceInfo.isInitialized) tvDeviceInfo.text = "Node: $name" }
+    }
+
+    private fun initUI() {
+        tvStatus = findViewById(R.id.tv_connection_status)
+        tvGps = findViewById(R.id.tv_gps_display)
+        tvDeviceInfo = findViewById(R.id.tv_device_info)
+        tvNetLog = findViewById(R.id.tv_network_log)
+        scrollLog = findViewById(R.id.scroll_log)
+        cbHostMode = findViewById(R.id.cb_host_mode)
+        btnToggleSensor = findViewById(R.id.btn_toggle_sensor)
+        lvPeers = findViewById(R.id.lv_peers)
+        spinnerMsgs = findViewById(R.id.spinner_tactical_msgs)
+
+        peersAdapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, mutableListOf<String>())
+        lvPeers.adapter = peersAdapter
+        lvPeers.setOnItemClickListener { _, _, position, _ -> connectToPeer(discoveredPeers[position]) }
+
+        // Setup Dropdown Messages
+        val tacticalMessages = arrayOf("✅ ALL CLEAR / SAFE", "🆘 TRAPPED / NEED HELP", "🏥 INJURED / NEED MEDIC", "💧 NEED WATER / SUPPLIES", "🔋 BATTERY LOW - HURRY")
+        val spinnerAdapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, tacticalMessages)
+        spinnerMsgs.adapter = spinnerAdapter
+
+        findViewById<Button>(R.id.btn_discover).setOnClickListener { 
+            if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                manager?.discoverPeers(channel, null)
+            } else { requestPermissions() }
+        }
+        
+        findViewById<Button>(R.id.btn_sos).setOnClickListener { 
+            sendEmergencySos()
+            runEmergencyFlash() 
+        }
+
+        findViewById<Button>(R.id.btn_send_custom).setOnClickListener {
+            sendCustomMessage()
+        }
+        
+        btnToggleSensor.setOnClickListener { 
+            if (audioSensor == null) {
+                audioSensor = AudioSensor(networkService, "192.168.49.1").apply { startRecording() }
+                btnToggleSensor.text = "STOP SENSOR"
+            } else {
+                audioSensor?.stopRecording()
+                audioSensor = null
+                btnToggleSensor.text = "START SENSOR"
+            }
+        }
+
+        cbHostMode.setOnCheckedChangeListener { _, isChecked -> networkService.isGroupOwner = isChecked }
+    }
+
+    private fun sendCustomMessage() {
+        val msg = spinnerMsgs.selectedItem.toString()
+        val p = NetworkService.CustomPacket(myNodeName, "192.168.49.1", "MSG", System.currentTimeMillis(), msg.toByteArray())
+        networkService.sendDataPacket(p)
+        appendLog("Sent: $msg")
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun connectToPeer(device: WifiP2pDevice) {
+        val config = android.net.wifi.p2p.WifiP2pConfig().apply { deviceAddress = device.deviceAddress; groupOwnerIntent = if(cbHostMode.isChecked) 15 else 0 }
+        appendLog("Inviting Hub: ${device.deviceName}...")
+        manager?.connect(channel, config, object : WifiP2pManager.ActionListener {
+            override fun onSuccess() { appendLog("Invitation Sent.") }
+            override fun onFailure(r: Int) { appendLog("Link Failed: $r") }
+        })
+    }
+
+    private fun sendEmergencySos() {
+        val p = NetworkService.CustomPacket(myNodeName, "192.168.49.1", "SOS", System.currentTimeMillis(), "HELP EMERGENCY".toByteArray(), lastLocation?.latitude ?: 0.0, lastLocation?.longitude ?: 0.0)
+        networkService.sendDataPacket(p)
+        appendLog("LOCAL SOS TRIGGERED")
+    }
+
+    private fun runEmergencyFlash() {
+        lifecycleScope.launch {
+            try {
+                val cam = getSystemService(Context.CAMERA_SERVICE) as CameraManager
+                if (cam.cameraIdList.isNotEmpty()) {
+                    val id = cam.cameraIdList[0]
+                    repeat(10) { cam.setTorchMode(id, true); delay(100); cam.setTorchMode(id, false); delay(100) }
+                }
+            } catch (e: Exception) { }
+        }
+    }
+
+    private fun setupGPS() {
+        val lm = getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        val locListener = object : LocationListener {
+            override fun onLocationChanged(l: Location) { 
+                lastLocation = l
+                runOnUiThread { if (this@MainActivity::tvGps.isInitialized) tvGps.text = "GPS: ${String.format("%.5f", l.latitude)}, ${String.format("%.5f", l.longitude)}" }
+            }
+            override fun onProviderEnabled(p: String) {}
+            override fun onProviderDisabled(p: String) {}
+        }
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+            lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 2000L, 1f, locListener)
+            lm.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 2000L, 1f, locListener)
+        }
+    }
+
+    private fun appendLog(msg: String) {
+        runOnUiThread {
+            if (this::tvNetLog.isInitialized) {
+                tvNetLog.append("\n> $msg")
+                scrollLog.post { scrollLog.fullScroll(View.FOCUS_DOWN) }
+            }
+        }
+    }
+
+    override fun onResume() { super.onResume(); registerReceiver(receiver, intentFilter) }
+    override fun onPause() { super.onPause(); try { unregisterReceiver(receiver) } catch (e: Exception) {} }
+}
