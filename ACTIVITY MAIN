@@ -1,0 +1,189 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#0D1B2A">
+
+    <!-- Premium Header -->
+    <TextView
+        android:id="@+id/tv_header"
+        android:layout_width="match_parent"
+        android:layout_height="65dp"
+        android:background="#1B263B"
+        android:text="RESQ-WAVE TACTICAL"
+        android:textColor="#A8DADC"
+        android:textSize="22sp"
+        android:textStyle="bold"
+        android:letterSpacing="0.1"
+        android:elevation="8dp"
+        android:gravity="center" />
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fillViewport="true">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <!-- Device & GPS Info Card -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="#1B263B"
+                android:padding="12dp"
+                android:layout_marginBottom="12dp">
+
+                <TextView
+                    android:id="@+id/tv_device_info"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Node: Identifying..."
+                    android:textColor="#E0E1DD"
+                    android:textStyle="bold"
+                    android:textSize="14sp" />
+
+                <TextView
+                    android:id="@+id/tv_gps_display"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="GPS: Synchronizing Satellites..."
+                    android:textColor="#457B9D"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/tv_connection_status"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Status: OFFLINE"
+                    android:textColor="#E63946"
+                    android:textStyle="bold"
+                    android:layout_marginTop="4dp" />
+            </LinearLayout>
+
+            <!-- Peer List (Compact Version) -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="AVAILABLE NODES (Tap to Connect)"
+                android:textColor="#A8DADC"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="4dp" />
+
+            <ListView
+                android:id="@+id/lv_peers"
+                android:layout_width="match_parent"
+                android:layout_height="90dp"
+                android:background="#415A77"
+                android:divider="#1B263B"
+                android:dividerHeight="1dp"
+                android:layout_marginBottom="12dp" />
+
+            <!-- Messaging Dropdown Section -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:background="#1B263B"
+                android:padding="8dp"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="12dp">
+
+                <Spinner
+                    android:id="@+id/spinner_tactical_msgs"
+                    android:layout_width="0dp"
+                    android:layout_height="45dp"
+                    android:layout_weight="1"
+                    android:backgroundTint="#A8DADC" />
+
+                <Button
+                    android:id="@+id/btn_send_custom"
+                    android:layout_width="80dp"
+                    android:layout_height="45dp"
+                    android:text="SEND"
+                    android:textSize="12sp"
+                    android:backgroundTint="#457B9D"
+                    android:textColor="#FFFFFF"
+                    android:layout_marginStart="8dp" />
+            </LinearLayout>
+
+            <!-- Control Buttons -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:weightSum="2">
+                <Button
+                    android:id="@+id/btn_discover"
+                    android:layout_width="0dp"
+                    android:layout_height="55dp"
+                    android:layout_weight="1"
+                    android:backgroundTint="#457B9D"
+                    android:text="DISCOVER"
+                    android:layout_marginEnd="4dp" />
+                <Button
+                    android:id="@+id/btn_toggle_sensor"
+                    android:layout_width="0dp"
+                    android:layout_height="55dp"
+                    android:layout_weight="1"
+                    android:backgroundTint="#2A9D8F"
+                    android:text="START SENSOR"
+                    android:layout_marginStart="4dp" />
+            </LinearLayout>
+
+            <!-- Attractive SOS Button -->
+            <Button
+                android:id="@+id/btn_sos"
+                android:layout_width="match_parent"
+                android:layout_height="90dp"
+                android:text="SEND SOS ALERT"
+                android:textSize="24sp"
+                android:textStyle="bold"
+                android:backgroundTint="#E63946"
+                android:textColor="#FFFFFF"
+                android:layout_marginTop="12dp"
+                android:elevation="10dp" />
+
+            <CheckBox
+                android:id="@+id/cb_host_mode"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="HOST (COMMANDER HUB)"
+                android:textColor="#A8DADC"
+                android:layout_marginTop="8dp" />
+
+            <!-- Tactical Log -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="LIVE DATA FEED"
+                android:textColor="#A8DADC"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:layout_marginTop="16dp" />
+
+            <ScrollView
+                android:id="@+id/scroll_log"
+                android:layout_width="match_parent"
+                android:layout_height="200dp"
+                android:background="#0D1B2A"
+                android:padding="8dp"
+                android:layout_marginTop="4dp">
+                <TextView
+                    android:id="@+id/tv_network_log"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Tactical link ready...\n"
+                    android:textColor="#2A9D8F"
+                    android:fontFamily="monospace"
+                    android:textSize="11sp" />
+            </ScrollView>
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>
