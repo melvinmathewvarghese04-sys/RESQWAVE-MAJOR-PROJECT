@@ -1,0 +1,34 @@
+package com.example.adhocacousticrescue
+
+import com.google.gson.Gson
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
+
+object PacketSerializer {
+    private val GSON = Gson()
+
+    fun serialize(packet: NetworkService.CustomPacket): ByteArray {
+        val headerOnly = packet.copy(data = ByteArray(0))
+        val headerJson = GSON.toJson(headerOnly).toByteArray(Charsets.UTF_8)
+        val buffer = ByteBuffer.allocate(4 + headerJson.size + packet.data.size).order(ByteOrder.LITTLE_ENDIAN)
+        buffer.putInt(headerJson.size)
+        buffer.put(headerJson)
+        buffer.put(packet.data)
+        return buffer.array()
+    }
+
+    fun deserialize(byteArray: ByteArray): NetworkService.CustomPacket? {
+        if (byteArray.size < 4) return null
+        val buffer = ByteBuffer.wrap(byteArray).order(ByteOrder.LITTLE_ENDIAN)
+        val headerSize = buffer.getInt()
+        if (buffer.remaining() < headerSize) return null
+        val headerBytes = ByteArray(headerSize)
+        buffer.get(headerBytes)
+        return try {
+            val header = GSON.fromJson(String(headerBytes), NetworkService.CustomPacket::class.java)
+            val data = ByteArray(buffer.remaining())
+            buffer.get(data)
+            header.copy(data = data)
+        } catch (e: Exception) { null }
+    }
+}
