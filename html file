@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>ResQ-Wave</title>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+
+<style>
+body {
+    margin:0;
+    font-family:'Segoe UI';
+    background:black;
+    color:#e2e8f0;
+}
+
+/* SPLASH */
+#splash {
+    position:fixed;
+    width:100vw;
+    height:100vh;
+    background:url('crysis.jpg') center/cover no-repeat;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    flex-direction:column;
+    z-index:99999;
+}
+
+#sidebar, #main { display:none; }
+
+/* ✨ FANCY BUTTON */
+#enterBtn {
+    padding:20px 70px;
+    font-size:26px;
+    border-radius:50px;
+    border:none;
+    background:linear-gradient(45deg, cyan, magenta);
+    color:black;
+    cursor:pointer;
+    box-shadow:0 0 25px cyan;
+    animation:glow 1.5s infinite alternate;
+}
+@keyframes glow {
+    from { box-shadow:0 0 10px cyan; }
+    to { box-shadow:0 0 40px magenta; }
+}
+
+/* SIDEBAR */
+#sidebar {
+    position:fixed;
+    width:240px;
+    height:100%;
+    background:#020617;
+}
+#sidebar button {
+    width:100%;
+    padding:20px;
+    font-size:20px;
+    color:cyan;
+    background:none;
+    border:none;
+    text-align:left;
+}
+
+/* MAIN */
+#main {
+    margin-left:240px;
+    padding:20px;
+}
+
+.section { display:none; }
+.active { display:block; }
+
+/* HEADER */
+#title {
+    font-size:70px;
+    text-align:center;
+    background:linear-gradient(90deg, cyan, magenta, yellow);
+    -webkit-background-clip:text;
+    color:transparent;
+}
+
+/* CARD */
+.card {
+    padding:25px;
+    border-radius:20px;
+    width:340px;
+    font-size:18px;
+    color:white;
+}
+
+/* PRIORITY COLORS */
+.critical { background:#2b0000; box-shadow:0 0 25px red; }
+.high { background:#332100; box-shadow:0 0 25px orange; }
+.normal { background:#002b1a; box-shadow:0 0 25px green; }
+
+/* 🗺️ BIGGER MAP */
+#map {
+    position:fixed;
+    right:20px;
+    bottom:20px;
+    width:380px;
+    height:260px;
+    border-radius:15px;
+    box-shadow:0 0 20px cyan;
+}
+
+/* CONTACTS */
+.contact-box {
+    background:#020617;
+    padding:40px;
+    margin:20px;
+    font-size:26px;
+    border-radius:20px;
+    box-shadow:0 0 25px cyan;
+}
+
+/* ABOUT */
+.big-text {
+    font-size:20px;
+    line-height:1.8;
+    max-width:900px;
+}
+
+/* LOG TABLE */
+table {
+    width:100%;
+    border-collapse:collapse;
+}
+th, td {
+    padding:12px;
+    border-bottom:1px solid cyan;
+}
+th { color:cyan; }
+
+</style>
+</head>
+
+<body>
+
+<!-- SPLASH -->
+<div id="splash">
+<h1 style="font-size:70px;">🚨 ResQ-Wave</h1>
+<button id="enterBtn" onclick="enterApp()">ENTER SYSTEM</button>
+</div>
+
+<!-- SIDEBAR -->
+<div id="sidebar">
+<button onclick="showSection('dashboard')">Dashboard</button>
+<button onclick="showSection('contacts')">Contacts</button>
+<button onclick="showSection('literature')">Literature</button>
+<button onclick="showSection('logs')">Logs</button>
+<button onclick="showSection('about')">About</button>
+</div>
+
+<div id="main">
+
+<!-- DASHBOARD -->
+<div id="dashboard" class="section active">
+
+<div id="title">RESQWAVE</div>
+
+<div id="data"></div>
+
+<div id="map"></div>
+
+</div>
+
+<!-- CONTACTS -->
+<div id="contacts" class="section">
+<h1>Emergency Contacts</h1>
+<div class="contact-box">🚓 POLICE CONTROL ROOM: 100</div>
+<div class="contact-box">🏥 AMBULANCE SERVICE: 102</div>
+<div class="contact-box">🚒 FIRE DEPARTMENT: 101</div>
+<div class="contact-box">🚑 DISASTER RESPONSE: 108</div>
+<div class="contact-box">📞 NATIONAL HELPLINE: 112</div>
+</div>
+
+<!-- LITERATURE -->
+<div id="literature" class="section">
+<h1>Literature Survey</h1>
+<p>[1] M. Saad et al., IEEE Access, 2021.</p>
+<p>[2] L. Zhang et al., IEEE IoT Journal, 2022.</p>
+<p>[3] E. Cakir et al., ICASSP, 2021.</p>
+<p>[4] S. Sigg et al., IEEE PerCom, 2022.</p>
+<p>[5] K. Koutini et al., Interspeech, 2022.</p>
+<p>[6] A. Boukerche et al., ACM Surveys, 2021.</p>
+<p>[7] Y. Liu et al., IEEE TMC, 2022.</p>
+<p>[8] H. Zhao et al., IEEE TVT, 2022.</p>
+<p>[9] M. Giordano et al., IEEE WiMob, 2021.</p>
+<p>[10] V. Borrel et al., ACM ICN, 2021.</p>
+<p>[11] Q. Zhang et al., IEEE Proceedings, 2021.</p>
+<p>[12] P. Porambage et al., IEEE Communications.</p>
+</div>
+
+<!-- LOGS -->
+<div id="logs" class="section">
+<h1>Logs</h1>
+<div id="logTable"></div>
+</div>
+
+<!-- ABOUT -->
+<div id="about" class="section">
+<h1>About ResQ-Wave</h1>
+
+<p class="big-text">
+ResQ-Wave is an advanced emergency communication system designed to operate in disaster scenarios where traditional networks fail. It enables direct device-to-device communication using WiFi Direct, ensuring uninterrupted transmission of SOS alerts and location data.
+</p>
+
+<p class="big-text">
+The system incorporates AI-based classification to prioritize emergencies and improve rescue response. With real-time tracking and intelligent alerting, it enhances decision-making in critical situations.
+</p>
+
+</div>
+
+</div>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+<script>
+let map;
+let logs=[];
+let lastId=null;
+
+/* AREA NAME */
+async function getAreaName(lat, lng){
+    try{
+        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
+        const data = await res.json();
+        const a = data.address;
+        return `${a.suburb || a.village || ""}, ${a.city || a.state || ""}`;
+    }catch{
+        return "Unknown Location";
+    }
+}
+
+function enterApp(){
+document.getElementById("splash").style.display="none";
+document.getElementById("sidebar").style.display="block";
+document.getElementById("main").style.display="block";
+
+map=L.map('map').setView([20,78],5);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+}
+
+function showSection(id){
+document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+document.getElementById(id).classList.add('active');
+}
+
+function getClass(ai){
+if(ai.includes("CRITICAL")) return "critical";
+if(ai.includes("HIGH")) return "high";
+return "normal";
+}
+
+function getColor(ai){
+if(ai.includes("CRITICAL")) return "red";
+if(ai.includes("HIGH")) return "orange";
+return "green";
+}
+
+async function fetchData(){
+const res=await fetch("http://localhost:5000/data");
+const data=await res.json();
+
+if(!data.length) return;
+
+const latest=data[data.length-1];
+
+if(latest.timestamp===lastId) return;
+lastId=latest.timestamp;
+
+const lat=parseFloat(latest.latitude);
+const lng=parseFloat(latest.longitude);
+
+map.setView([lat,lng],15);
+
+L.circleMarker([lat,lng],{
+radius:10,
+color:getColor(latest.ai)
+}).addTo(map);
+
+const area = await getAreaName(lat,lng);
+
+document.getElementById("data").innerHTML=`
+<div class="card ${getClass(latest.ai)}">
+🚨 ${latest.ai}<br>
+👤 ${latest.identity}<br>
+📞 ${latest.contact}<br>
+🔋 ${latest.battery}%<br>
+📍 ${area}<br>
+🧭 (${lat}, ${lng})
+</div>
+`;
+
+logs.push(latest);
+
+let table=`<table>
+<tr><th>Name</th><th>Priority</th><th>Battery</th><th>Location</th></tr>`;
+
+logs.forEach(l=>{
+table+=`<tr>
+<td>${l.identity}</td>
+<td>${l.ai}</td>
+<td>${l.battery}%</td>
+<td>${l.latitude},${l.longitude}</td>
+</tr>`;
+});
+
+table+="</table>";
+
+document.getElementById("logTable").innerHTML=table;
+}
+
+setInterval(fetchData,2000);
+</script>
+
+</body>
+</html>
