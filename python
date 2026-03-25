@@ -1,0 +1,139 @@
+import socket
+import threading
+import json
+from datetime import datetime
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from openai import OpenAI
+
+# 🔑 PUT YOUR OPENAI API KEY HERE
+client = OpenAI(api_key="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")
+
+HOST = "0.0.0.0"
+PORT = 9999
+
+latest_data = []
+
+
+def log(msg):
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}")
+
+
+# 🧠 AI FUNCTION
+def analyze_with_ai(packet):
+    try:
+        prompt = f"""
+You are an intelligent disaster response system.
+
+Rules:
+- CRITICAL → Battery < 20%
+- HIGH → SOS signal
+- MEDIUM → Assistance
+- LOW → Safe
+
+Data:
+Type: {packet.get('type')}
+Identity: {packet.get('identity')}
+Battery: {packet.get('battery')}%
+Location: {packet.get('latitude')}, {packet.get('longitude')}
+
+Respond: PRIORITY - reason
+"""
+
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "Disaster response AI"},
+                {"role": "user", "content": prompt}
+            ]
+        )
+
+        return response.choices[0].message.content
+
+    except Exception as e:
+        battery = packet.get("battery", 100)
+
+        if battery < 20:
+            return "CRITICAL - Battery low"
+        else:
+            return "HIGH - Emergency detected"
+
+
+# 📡 HANDLE CLIENT
+def handle_client(conn, addr):
+    log(f"Connected: {addr}")
+
+    try:
+        while True:
+            data = conn.recv(4096)
+            if not data:
+                break
+
+            try:
+                message = data.decode()
+                packet = json.loads(message)
+
+                print("\n🚨 SOS RECEIVED 🚨")
+                print(f"👤 {packet.get('identity')}")
+                print(f"📞 {packet.get('contact')}")
+                print(f"🔋 {packet.get('battery')}%")
+                print(f"📍 {packet.get('latitude')}, {packet.get('longitude')}")
+
+                print("\n🧠 Running AI...\n")
+
+                result = analyze_with_ai(packet)
+
+                print("🔥 AI RESULT:")
+                print(result)
+                print("\n--------------------------\n")
+
+                # ✅ SAVE FOR WEBSITE
+                packet["ai"] = result
+                latest_data.append(packet)
+
+                if len(latest_data) > 10:
+                    latest_data.pop(0)
+
+            except Exception as e:
+                log(f"Error: {e}")
+
+    finally:
+        conn.close()
+        log(f"Disconnected: {addr}")
+
+
+# 🌐 WEB SERVER
+class WebHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        if self.path == "/data":
+            self.send_response(200)
+            self.send_header("Content-type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+
+            self.wfile.write(json.dumps(latest_data).encode())
+
+
+def start_web_server():
+    web_server = HTTPServer(("0.0.0.0", 5000), WebHandler)
+    print("🌐 Web Dashboard running at http://localhost:5000/data")
+    web_server.serve_forever()
+
+
+# 🚀 SOCKET SERVER
+def start_server():
+    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server.bind((HOST, PORT))
+    server.listen()
+
+    print(f"🔥 AI Command Center running on {HOST}:{PORT}")
+
+    while True:
+        conn, addr = server.accept()
+        thread = threading.Thread(target=handle_client, args=(conn, addr))
+        thread.start()
+
+
+# ▶️ MAIN
+if __name__ == "__main__":
+    threading.Thread(target=start_web_server, daemon=True).start()
+    start_server()
